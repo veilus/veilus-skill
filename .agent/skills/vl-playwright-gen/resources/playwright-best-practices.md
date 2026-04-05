@@ -2,6 +2,7 @@
 
 > Reference document for AI agents generating Playwright code via vl-playwright-gen.
 > Read this BEFORE generating any test code.
+> For external API integrations (CAPTCHA, Email, SMS, Payment, OAuth), see `external-integrations.md`.
 
 ---
 
@@ -128,9 +129,89 @@ await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
 ### ✅ Human Checkpoint (CAPTCHA/MFA)
 
 ```typescript
-// Pause for manual intervention
+// Pause for manual intervention (simplest approach)
 // ⚠️ HUMAN CHECKPOINT: CAPTCHA detected. Complete manually, then press Resume.
 await page.pause();
+```
+
+### ✅ CAPTCHA Solving APIs (Automated)
+
+When manual solving isn't practical (CI/CD, large-scale runs), use a CAPTCHA solving API:
+
+| Service | Package | reCAPTCHA v2 | reCAPTCHA v3 | hCaptcha | Turnstile | Avg Speed |
+|---------|---------|:---:|:---:|:---:|:---:|-----------|
+| [2Captcha](https://2captcha.com) | `2captcha` | ✅ | ✅ | ✅ | ✅ | ~15-30s |
+| [CapSolver](https://capsolver.com) | `capsolver-npm` | ✅ | ✅ | ✅ | ✅ | ~5-15s |
+| [Anti-Captcha](https://anti-captcha.com) | `@antiadmin/anticaptchaofficial` | ✅ | ✅ | ✅ | ❌ | ~15-30s |
+
+**Token-based integration pattern:**
+
+```typescript
+import Captcha from '2captcha'; // or capsolver-npm, etc.
+
+// 1. Detect CAPTCHA on page
+const captchaFrame = page.locator('iframe[src*="recaptcha"], iframe[src*="hcaptcha"]');
+if (await captchaFrame.count() > 0) {
+  // 2. Extract sitekey from page
+  const sitekey = await page.evaluate(() => {
+    const el = document.querySelector('.g-recaptcha, [data-sitekey]');
+    return el?.getAttribute('data-sitekey') ?? '';
+  });
+
+  // 3. Send to solving API
+  const solver = new Captcha.Solver(process.env.CAPTCHA_API_KEY!);
+  const { data: token } = await solver.recaptcha({
+    pageurl: page.url(),
+    googlekey: sitekey,
+  });
+
+  // 4. Inject solution token
+  await page.evaluate((token) => {
+    const textarea = document.querySelector('#g-recaptcha-response') as HTMLTextAreaElement;
+    if (textarea) { textarea.value = token; }
+    // Trigger callback if exists
+    const callback = (window as any).___grecaptcha_cfg?.clients?.[0]?.S?.S?.callback;
+    if (callback) callback(token);
+  }, token);
+}
+```
+
+**Browser extension approach (simpler, CapSolver example):**
+
+```typescript
+import { chromium } from '@playwright/test';
+
+// Load CapSolver extension into browser context
+const context = await chromium.launchPersistentContext('', {
+  headless: false,
+  args: [
+    '--disable-extensions-except=/path/to/capsolver-extension',
+    '--load-extension=/path/to/capsolver-extension',
+  ],
+});
+```
+
+### ✅ CAPTCHA Prevention (Best Strategy)
+
+> Prevention is cheaper and more reliable than solving. Prioritize these:
+
+```typescript
+// 1. Use playwright-stealth to hide automation signals
+// npm install playwright-extra playwright-extra-plugin-stealth
+import { chromium } from 'playwright-extra';
+import stealth from 'playwright-extra-plugin-stealth';
+chromium.use(stealth());
+
+// 2. Use a real browser profile (VeilusBrowser)
+// Uncomment in playwright.config.ts:
+// launchOptions: { executablePath: process.env.VEILUS_BROWSER_PATH }
+
+// 3. Use residential proxies to avoid IP-based blocking
+// In playwright.config.ts:
+// use: { proxy: { server: process.env.PROXY_URL } }
+
+// 4. Add realistic delays between actions
+await page.waitForTimeout(Math.random() * 2000 + 500); // 500-2500ms random delay
 ```
 
 ### ✅ Disambiguation (Multiple Matches)
@@ -243,3 +324,29 @@ test.describe('Login Flow', () => {
   ```typescript
   // launchOptions: { executablePath: process.env.VEILUS_BROWSER_PATH }
   ```
+
+---
+
+## 8. External Integration Detection
+
+During page inspection (Step 2), detect elements that require external API integration. When detected, reference `external-integrations.md` for code patterns and service recommendations.
+
+| Detection Signal | Integration | Resource Section |
+|-----------------|-------------|------------------|
+| CAPTCHA iframe, `/sorry/`, `/challenge` | CAPTCHA Solving | §CAPTCHA (above) + external-integrations §1 |
+| Email input + "check your email" | Email Testing API | external-integrations §1 |
+| OTP input, `maxlength="6"`, "enter code" | SMS/OTP API | external-integrations §2 |
+| Stripe/PayPal iframe, card form | Payment Sandbox | external-integrations §3 |
+| "Sign in with Google/FB/GitHub" | OAuth Handling | external-integrations §4 |
+| Design-heavy layouts, responsive views | Visual Regression | external-integrations §5 |
+| Geo-restricted content, locale switching | Geo/Proxy Service | external-integrations §6 |
+| Download buttons, PDF/CSV links | File Verification | external-integrations §7 |
+| Cloudflare challenge, bot detection | Anti-bot Bypass | external-integrations §8 |
+| Registration forms, data-heavy inputs | Test Data Generation | external-integrations §9 |
+| WebSocket, live chat, notifications | Real-time Testing | external-integrations §10 |
+
+When any of these patterns are detected during inspection, the agent SHOULD:
+1. Flag the pattern in the inspection summary
+2. Suggest the appropriate integration from `external-integrations.md`
+3. Add placeholder `.env` variables to `.env.example`
+4. Generate helper utilities or suggest packages in `package.json`

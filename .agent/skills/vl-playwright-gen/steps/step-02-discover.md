@@ -112,9 +112,28 @@ If `{{flow_description}}` describes multiple pages:
 6. If new page detected → go back to step 2 (snapshot new page)
 7. Repeat until flow is complete or user says "stop"
 
-**CAPTCHA/MFA Detection:**
-- If CAPTCHA detected → flag as Human Checkpoint: `"⚠️ CAPTCHA detected at this step"`
-- If MFA/OTP input detected → flag as Human Checkpoint: `"⚠️ MFA/2FA detected"`
+**External Integration Detection:**
+
+During inspection, detect elements/patterns that require external API integration. Flag each in the summary.
+
+| Detection Signal | Flag Message | Integration | Trigger |
+|-----------------|-------------|-------------|----------|
+| `iframe[src*="recaptcha"]`, `.g-recaptcha`, URL `/sorry/` | `⚠️ CAPTCHA detected` | CAPTCHA Solving API | Auto |
+| MFA/OTP input (`maxlength="6"`, `autocomplete="one-time-code"`) | `⚠️ MFA/2FA detected` | SMS API (Twilio) | Auto |
+| Email form + "check your email" / "verify" text | `📧 Email verification flow detected` | Email API (Mailosaur) | Auto |
+| `iframe[src*="stripe"]`, `input[name*="card"]`, URL `/checkout` | `💳 Payment form detected` | Payment Sandbox | Auto |
+| "Sign in with Google/Facebook/GitHub", OAuth redirect links | `🔐 OAuth/Social login detected` | OAuth Handling | Auto |
+| Cloudflare challenge, DataDome, `cf-challenge` | `🤖 Anti-bot protection detected` | Stealth + Proxy | Auto |
+| `a[download]`, PDF/CSV download buttons | `📄 File download detected` | File Verification | Auto |
+| WebSocket connections, live chat widgets | `💬 Real-time features detected` | WebSocket Testing | Auto |
+| Registration forms with many fields (>5 inputs) | `📝 Complex form — suggest faker.js` | Test Data Generation | Auto |
+| Geo-restricted content, locale selector | `🌍 Geo-sensitive content detected` | Proxy/Geolocation | Auto |
+| `aria-*` attributes, form elements, images without alt | `♿ Accessibility scan recommended` | axe-core (§13) | Always |
+| Login form, password inputs, sensitive data fields | `🔒 Security testing opportunity` | OWASP ZAP (§14) | Auto |
+| Navigation-heavy flow (>2 page transitions) | `⚡ Performance metrics recommended` | Lighthouse/Web Vitals (§15) | Auto |
+| External API calls in network log | `🔌 API mocking recommended` | MSW / page.route() (§20) | Auto |
+
+For detailed integration patterns, see `../resources/external-integrations.md`.
 
 ### 7. Proceed
 
@@ -126,6 +145,11 @@ Pages inspected: {{page_count}}
 Total elements: {{element_count}}
 Low confidence selectors: {{low_confidence_count}}
 Human checkpoints: {{checkpoint_count}}
+External integrations needed: {{integration_count}}
+
+{{#each integrations}}
+  {{flag_emoji}} {{integration_name}}: {{description}}
+{{/each}}
 
 [C] Continue to review findings
 ```
@@ -142,3 +166,5 @@ When user selects [C], read fully and follow: `./step-03-plan.md`
 ❌ Not pausing at each page for user confirmation
 ❌ Missing cascade selector fallbacks
 ❌ Not detecting CAPTCHA/MFA
+❌ Not detecting external integration needs (email, SMS, payment, OAuth)
+❌ Not flagging anti-bot protection signals

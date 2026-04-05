@@ -28,21 +28,81 @@ Checking prerequisites...
 **Check Playwright MCP availability:**
 - Try to use the `browser_navigate` or `browser_snapshot` Playwright MCP tool
 - If MCP tools are available → report "✅ Playwright MCP: Ready"
-- If MCP tools are NOT available → HALT with:
+- If MCP tools are NOT available → HALT with installation instructions below:
+
   ```
   ❌ Playwright MCP not available.
   
-  To install, add Playwright MCP to your AI assistant configuration:
-  
-  For Antigravity — add to MCP settings:
-    Server name: playwright
-    Command: npx @playwright/mcp@latest
-  
-  For Claude Code — add to MCP config:
-    npx @playwright/mcp@latest
-  
-  After installing, restart your AI assistant and try again.
+  Please add Playwright MCP to your AI assistant, then restart.
   ```
+
+  **Provide the matching guide for the user's platform:**
+
+  ---
+
+  #### Antigravity (Google Gemini CLI)
+
+  Edit `~/.gemini/antigravity/mcp_config.json` and add the `playwright` entry
+  inside the existing `mcpServers` object:
+
+  ```jsonc
+  {
+    "mcpServers": {
+      "playwright": {
+        "command": "npx",
+        "args": ["-y", "@playwright/mcp@latest"]
+      }
+      // ... other existing servers stay as-is
+    }
+  }
+  ```
+
+  Then **restart Antigravity** to load the new server.
+
+  ---
+
+  #### Claude Code
+
+  Edit `~/.claude.json` (create if missing) and add:
+
+  ```jsonc
+  {
+    "mcpServers": {
+      "playwright": {
+        "command": "npx",
+        "args": ["-y", "@playwright/mcp@latest"]
+      }
+    }
+  }
+  ```
+
+  Then restart Claude Code.
+
+  ---
+
+  #### Cursor
+
+  Open **Settings → MCP → Add Server** and configure:
+  - **Name:** `playwright`
+  - **Type:** `command`
+  - **Command:** `npx -y @playwright/mcp@latest`
+
+  Or add directly to `.cursor/mcp.json` in your project:
+
+  ```jsonc
+  {
+    "mcpServers": {
+      "playwright": {
+        "command": "npx",
+        "args": ["-y", "@playwright/mcp@latest"]
+      }
+    }
+  }
+  ```
+
+  ---
+
+  After configuring, restart the AI assistant and run this workflow again.
 
 ### 2. Gather User Requirements
 
@@ -58,13 +118,16 @@ Ready to generate Playwright tests! I need a few details:
    Example: "Login with email/password, then navigate to dashboard"
 
 3. **Output Directory** (optional) — Where to save generated files?
-   Default: ./playwright-gen-output/
+   Default: {{workspace_root}}/playwright-gen-output/
+   ⚠️ Output MUST be outside the skill directory.
 ```
 
 **Wait for user input.** Store:
 - `{{target_url}}` — the starting URL
 - `{{flow_description}}` — what the flow covers
-- `{{output_dir}}` — output path (default: `./playwright-gen-output/`)
+- `{{output_dir}}` — output path (default: `{{workspace_root}}/playwright-gen-output/`)
+
+**IMPORTANT:** The output directory MUST be outside the skill directory. Use the user's active workspace root or a sibling directory. Never generate code inside `vl-playwright-gen/`.
 
 ### 3. Scaffold Project Structure
 

@@ -51,18 +51,78 @@ Type: {{pageType}} | Framework: {{framework}}
 ═══════════════════
 
 Files to generate:
-├── pages/login.page.ts         (5 elements, 1 action method)
-├── pages/dashboard.page.ts     (8 elements, 0 action methods)
-├── tests/login-dashboard.spec.ts (1 test with 2 page transitions)
+├── tests/{{flow-name}}.spec.ts    (POM classes + tests in 1 file)
 ├── playwright.config.ts
-├── .env.example                (BASE_URL, TEST_EMAIL, TEST_PASSWORD)
+├── .env.example                   (BASE_URL, TEST_EMAIL, TEST_PASSWORD)
 ├── .gitignore
 └── README.md
 
 🔒 Human Checkpoints: 1 (CAPTCHA at login)
 ```
 
-### 3. Get Developer Confirmation
+### 3. Present Integration Suggestions (Context-Based)
+
+Based on inspection findings, suggest relevant external integrations:
+
+```
+🔌 Recommended Integrations
+═══════════════════════════
+
+{{#each detectedIntegrations}}
+  {{flag_emoji}} {{integration_name}} (detected in Step 2)
+     → {{suggestion}}
+{{/each}}
+
+--- Always Recommended ---
+
+  ♿ Accessibility Testing
+     → npm install @axe-core/playwright (WCAG 2.1 compliance)
+     → See external-integrations.md §13
+
+  📊 Test Reporting (Allure)
+     → npm install allure-playwright (rich HTML reports with history)
+     → See external-integrations.md §16
+
+  🔄 CI/CD Pipeline
+     → Generate .github/workflows/playwright.yml
+     → See external-integrations.md §12
+
+--- Suggested Based on Context ---
+
+{{#if hasComplexForms}}
+  📝 Test Data Generation (faker.js)
+     → npm install @faker-js/faker
+{{/if}}
+
+{{#if hasExternalAPICalls}}
+  🔌 API Mocking (MSW or page.route)
+     → npm install msw (or use built-in page.route)
+{{/if}}
+
+{{#if requiresAuth}}
+  🗄️ Database Seeding
+     → Pre-populate test users via API or Prisma fixtures
+{{/if}}
+
+{{#if hasMultiplePages}}
+  👁️ Visual Regression
+     → Use built-in toHaveScreenshot() or npm install @percy/playwright
+{{/if}}
+
+{{#if isProductionApp}}
+  📡 Synthetic Monitoring
+     → Deploy tests as production monitors with Checkly
+{{/if}}
+
+Include integrations? [Y] Yes, add to plan / [N] No, skip / [S] Select specific ones
+```
+
+**Handle each option:**
+- **[Y] Yes**: Add all suggested integrations to generation plan
+- **[N] No**: Skip all integrations, proceed with basic plan
+- **[S] Select**: List each integration, let developer pick → update plan
+
+### 4. Get Developer Confirmation
 
 ```
 Review the plan and choose:

@@ -22,15 +22,24 @@ Read `../resources/playwright-best-practices.md` to inform code generation:
 - Anti-patterns to avoid
 - Code patterns to follow
 
-### 2. Generate Page Object Model Files
+### 2. Generate Single Test File (POM + Tests Combined)
 
-For each page in the confirmed plan, create `{{output_dir}}/pages/{{page-name}}.page.ts`:
+All Playwright code goes into **one file**: `{{output_dir}}/tests/{{flow-name}}.spec.ts`
+
+This file contains Page Object classes at the top, followed by test specs below.
 
 **Template Pattern:**
 ```typescript
-import { type Page, type Locator } from '@playwright/test';
+import { test, expect, type Page, type Locator } from '@playwright/test';
 
-export class {{PageName}}Page {
+// ============================================================
+// Page Object Models
+// ============================================================
+
+{{#each pages}}
+// --- {{PageName}} ({{url}}) ---
+
+class {{PageName}}Page {
   readonly page: Page;
   
   // Element declarations
@@ -60,30 +69,12 @@ export class {{PageName}}Page {
   }
   {{/each}}
 }
-```
 
-**Naming Convention:**
-- URL path → kebab-case → PascalCase class name
-- `/login` → `LoginPage`
-- `/dashboard/settings` → `DashboardSettingsPage`
-- File: `login.page.ts`, `dashboard-settings.page.ts`
-
-**Action Method Generation Rules:**
-- If page has a form → generate a method that fills all inputs and submits
-- Method name derived from form purpose: `login()`, `register()`, `createProject()`
-- Parameters = form fields (typed as `string`)
-- Credential parameters use `process.env.*` in test calls, NOT in POM
-
-### 3. Generate Test Spec File
-
-Create `{{output_dir}}/tests/{{flow-name}}.spec.ts`:
-
-**Template Pattern:**
-```typescript
-import { test, expect } from '@playwright/test';
-{{#each pages}}
-import { {{PageName}}Page } from '../pages/{{fileName}}';
 {{/each}}
+
+// ============================================================
+// Tests
+// ============================================================
 
 test.describe('{{flowName}}', () => {
   test('{{testName}}', async ({ page }) => {
@@ -113,6 +104,18 @@ test.describe('{{flowName}}', () => {
   });
 });
 ```
+
+**Key Rules:**
+- Page Object classes are NOT exported (no `export` keyword) — they're local to the file
+- URL path → PascalCase class name: `/login` → `LoginPage`
+- Single import statement at the top: `import { test, expect, type Page, type Locator }`
+- NO separate `pages/` directory — everything in one `.spec.ts` file
+
+**Action Method Generation Rules:**
+- If page has a form → generate a method that fills all inputs and submits
+- Method name derived from form purpose: `login()`, `register()`, `createProject()`
+- Parameters = form fields (typed as `string`)
+- Credential parameters use `process.env.*` in test calls, NOT in POM
 
 **Assertion Generation Rules:**
 - Always assert key elements are visible: `await expect(element).toBeVisible()`
@@ -160,8 +163,114 @@ TEST_EMAIL=your-test-email@example.com
 TEST_PASSWORD=your-test-password
 {{/if}}
 
+# Optional: CAPTCHA solving API
+# CAPTCHA_SERVICE=2captcha|capsolver|anticaptcha
+# CAPTCHA_API_KEY=your-api-key-here
+
+# Optional: Residential proxy
+# PROXY_URL=http://user:pass@proxy-host:port
+
 # Optional: VeilusBrowser path
 # VEILUS_BROWSER_PATH=/path/to/veilus-browser
+```
+
+### 6. Generate Integration Files (if accepted in Step 3)
+
+#### 6a. Accessibility — axe-core helper (Always Recommended)
+
+If developer accepted accessibility integration, add to test spec:
+```typescript
+import AxeBuilder from '@axe-core/playwright';
+
+// Add a11y check at end of each test or as separate test
+test('accessibility scan', async ({ page }) => {
+  await page.goto(process.env.BASE_URL!);
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa'])
+    .analyze();
+  expect(results.violations).toEqual([]);
+});
+```
+Add to package.json: `@axe-core/playwright`
+
+#### 6b. Reporting — Allure (Always Recommended)
+
+If developer accepted reporting, update `playwright.config.ts`:
+```typescript
+reporter: [
+  ['html'],
+  ['allure-playwright'],  // Rich reports with history & trends
+],
+```
+Add to package.json: `allure-playwright`
+Add `allure-results/` to `.gitignore`
+
+#### 6c. CI/CD Pipeline (Always Recommended)
+
+If developer accepted CI/CD, generate `.github/workflows/playwright.yml`:
+```yaml
+name: Playwright Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+```
+
+#### 6d. API Mocking (Context-Based)
+
+If external API calls were detected in network logs, generate mock helpers:
+```typescript
+// helpers/api-mocks.ts
+import { Page } from '@playwright/test';
+
+export async function mockExternalAPIs(page: Page) {
+  await page.route('**/api/external/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true }),
+    });
+  });
+}
+```
+
+#### 6e. Database Seeding (Context-Based)
+
+If auth/data requirements detected, generate seed fixture:
+```typescript
+// fixtures/db-seed.ts
+import { test as base } from '@playwright/test';
+
+// Extend with API-based data seeding
+export const test = base.extend({
+  seedUser: async ({ request }, use) => {
+    // Create test user via API before test
+    const response = await request.post('/api/test/seed', {
+      data: { email: 'test@example.com', password: 'Test123!' },
+    });
+    const user = await response.json();
+    await use(user);
+    // Cleanup after test
+    await request.delete(`/api/test/users/${user.id}`);
+  },
+});
 ```
 
 ### 6. Generate README.md
@@ -249,3 +358,5 @@ When user selects [C], read fully and follow: `./step-05-validate.md`
 ❌ Not reading best practices before generating
 ❌ Using CSS selectors without trying semantic selectors first
 ❌ Not generating README
+❌ Not suggesting accessibility / reporting / CI/CD integrations
+❌ Not generating integration files when developer accepted them
