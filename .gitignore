@@ -1,0 +1,23 @@
+# BMad
+_bmad/
+_bmad-output/
+
+# Playwright
+.playwright-mcp/
+playwright-gen-output/
+test-results/
+playwright-report/
+allure-results/
+allure-report/
+
+# Node
+node_modules/
+package-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
