@@ -51,11 +51,9 @@ Type: {{pageType}} | Framework: {{framework}}
 ═══════════════════
 
 Files to generate:
-├── pages/login.page.ts         (5 elements, 1 action method)
-├── pages/dashboard.page.ts     (8 elements, 0 action methods)
-├── tests/login-dashboard.spec.ts (1 test with 2 page transitions)
+├── tests/{{flow-name}}.spec.ts    (POM classes + tests in 1 file)
 ├── playwright.config.ts
-├── .env.example                (BASE_URL, TEST_EMAIL, TEST_PASSWORD)
+├── .env.example                   (BASE_URL, TEST_EMAIL, TEST_PASSWORD)
 ├── .gitignore
 └── README.md
 

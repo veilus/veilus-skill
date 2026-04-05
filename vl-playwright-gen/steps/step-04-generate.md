@@ -22,15 +22,24 @@ Read `../resources/playwright-best-practices.md` to inform code generation:
 - Anti-patterns to avoid
 - Code patterns to follow
 
-### 2. Generate Page Object Model Files
+### 2. Generate Single Test File (POM + Tests Combined)
 
-For each page in the confirmed plan, create `{{output_dir}}/pages/{{page-name}}.page.ts`:
+All Playwright code goes into **one file**: `{{output_dir}}/tests/{{flow-name}}.spec.ts`
+
+This file contains Page Object classes at the top, followed by test specs below.
 
 **Template Pattern:**
 ```typescript
-import { type Page, type Locator } from '@playwright/test';
+import { test, expect, type Page, type Locator } from '@playwright/test';
 
-export class {{PageName}}Page {
+// ============================================================
+// Page Object Models
+// ============================================================
+
+{{#each pages}}
+// --- {{PageName}} ({{url}}) ---
+
+class {{PageName}}Page {
   readonly page: Page;
   
   // Element declarations
@@ -60,30 +69,12 @@ export class {{PageName}}Page {
   }
   {{/each}}
 }
-```
 
-**Naming Convention:**
-- URL path → kebab-case → PascalCase class name
-- `/login` → `LoginPage`
-- `/dashboard/settings` → `DashboardSettingsPage`
-- File: `login.page.ts`, `dashboard-settings.page.ts`
-
-**Action Method Generation Rules:**
-- If page has a form → generate a method that fills all inputs and submits
-- Method name derived from form purpose: `login()`, `register()`, `createProject()`
-- Parameters = form fields (typed as `string`)
-- Credential parameters use `process.env.*` in test calls, NOT in POM
-
-### 3. Generate Test Spec File
-
-Create `{{output_dir}}/tests/{{flow-name}}.spec.ts`:
-
-**Template Pattern:**
-```typescript
-import { test, expect } from '@playwright/test';
-{{#each pages}}
-import { {{PageName}}Page } from '../pages/{{fileName}}';
 {{/each}}
+
+// ============================================================
+// Tests
+// ============================================================
 
 test.describe('{{flowName}}', () => {
   test('{{testName}}', async ({ page }) => {
@@ -113,6 +104,18 @@ test.describe('{{flowName}}', () => {
   });
 });
 ```
+
+**Key Rules:**
+- Page Object classes are NOT exported (no `export` keyword) — they're local to the file
+- URL path → PascalCase class name: `/login` → `LoginPage`
+- Single import statement at the top: `import { test, expect, type Page, type Locator }`
+- NO separate `pages/` directory — everything in one `.spec.ts` file
+
+**Action Method Generation Rules:**
+- If page has a form → generate a method that fills all inputs and submits
+- Method name derived from form purpose: `login()`, `register()`, `createProject()`
+- Parameters = form fields (typed as `string`)
+- Credential parameters use `process.env.*` in test calls, NOT in POM
 
 **Assertion Generation Rules:**
 - Always assert key elements are visible: `await expect(element).toBeVisible()`
